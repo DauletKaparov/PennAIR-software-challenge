@@ -50,8 +50,7 @@ This project implements a shape detection algorithm using OpenCV. It includes de
 - **Part 1**: [Static Image Detection Video]
 - **Part 2**: [Dynamic Video Detection Video]
 - **Part 3**: [Background Agnostic Detection Video]
+- **Part 4**: [3D detection]
 
-## License
-This project is licensed under the MIT License.
 ```
 
