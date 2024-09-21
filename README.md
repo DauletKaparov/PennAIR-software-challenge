@@ -44,7 +44,7 @@ This project implements a shape detection algorithm using OpenCV. It includes de
 1. **Part 1**: Detects shapes in a static image, traces outlines, and marks centers.
 2. **Part 2**: Applies the detection algorithm to video frames.
 3. **Part 3**: Adapts detection for varying backgrounds.
-4. **Part 4 (Optional)**: Extend the algorithm for 3D detection (not implemented in this submission).
+4. **Part 4 (Optional)**: Extend the algorithm for 3D detection.
 
 ## Videos
 - **Part 1**: [Static Image Detection Video]
