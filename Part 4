@@ -1,0 +1,118 @@
+import cv2
+import numpy as np
+
+# Load the video file
+video_path = '/Users/dauletkaparov/PycharmProjects/pythonProject/PennAir_2024_App_Dynamic.mp4'
+cap = cv2.VideoCapture(video_path)
+
+# Check if the video was loaded successfully
+if not cap.isOpened():
+    print("Error: Unable to open the video file.")
+    exit()
+
+# Camera intrinsic matrix
+K = np.array([[2564.3186869, 0, 0],
+              [0, 2569.70273111, 0],
+              [0, 0, 1]])
+
+# Known radius of the circle in inches
+circle_radius_in = 10
+
+# Convert radius to meters (assuming 1 inch = 0.0254 meters)
+circle_radius_m = circle_radius_in * 0.0254
+
+# Function to detect and label shapes based on the number of vertices
+def detect_shape(contour):
+    shape = "unidentified"
+    approx = cv2.approxPolyDP(contour, 0.04 * cv2.arcLength(contour, True), True)
+    vertices = len(approx)
+
+    if vertices == 3:
+        shape = "Triangle"
+    elif vertices == 4:
+        # Check if it's a square or rectangle
+        (x, y, w, h) = cv2.boundingRect(approx)
+        aspect_ratio = w / float(h)
+        if 0.95 <= aspect_ratio <= 1.05:
+            shape = "Square"
+        else:
+            shape = "Rectangle"
+    elif vertices == 5:
+        shape = "Pentagon"
+    else:
+        # For more than 5 vertices, assume it's a circle or oval
+        shape = "Circle"
+
+    return shape, approx
+
+# Minimum contour area to filter out noise
+min_contour_area = 500
+
+while cap.isOpened():
+    ret, frame = cap.read()
+
+    if not ret:
+        print("End of video stream.")
+        break
+
+    # Convert the frame to grayscale
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+    # Apply adaptive thresholding to account for varying background textures
+    adaptive_thresh = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+                                            cv2.THRESH_BINARY_INV, 11, 2)
+
+    # Apply morphological operations to clean up the image
+    kernel = np.ones((3, 3), np.uint8)
+    dilated = cv2.dilate(adaptive_thresh, kernel, iterations=2)
+    eroded = cv2.erode(dilated, kernel, iterations=1)
+
+    # Perform edge detection on the eroded image
+    edges = cv2.Canny(eroded, 50, 150)
+
+    # Find contours in the edge map
+    contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    for contour in contours:
+        # Filter out small contours by area
+        area = cv2.contourArea(contour)
+        if area < min_contour_area:
+            continue
+
+        # Detect shape and get the approximated contour
+        shape, approx = detect_shape(contour)
+
+        # Draw the contour outline (green)
+        cv2.drawContours(frame, [approx], -1, (0, 255, 0), 2)
+
+        # Compute the center of the shape using moments
+        M = cv2.moments(contour)
+        if M["m00"] != 0:
+            cX = int(M["m10"] / M["m00"])
+            cY = int(M["m01"] / M["m00"])
+
+            # Draw the center of the shape (blue)
+            cv2.circle(frame, (cX, cY), 5, (255, 0, 0), -1)
+
+            # Calculate the 3D coordinates
+            Z = circle_radius_m  # Assuming depth is the radius of the circle
+            X = (cX - K[0][2]) * Z / K[0][0]  # Calculate X using the intrinsic matrix
+            Y = (cY - K[1][2]) * Z / K[1][1]  # Calculate Y using the intrinsic matrix
+
+            # Print the 3D coordinates
+            print(f"Shape: {shape}, X: {X:.2f} m, Y: {Y:.2f} m, Z: {Z:.2f} m")
+
+            # Label the shape near the center
+            cv2.putText(frame, f"{shape} ({X:.2f}, {Y:.2f}, {Z:.2f})", (cX - 20, cY - 20),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+
+    # Display the frame with the detected shapes
+    cv2.imshow('Shape Detection on Video', frame)
+
+    # Break the loop if the 'q' key is pressed
+    if cv2.waitKey(50) & 0xFF == ord('q'):  # Increased delay for slower playback
+        break
+
+# Release the video capture and close all OpenCV windows
+cap.release()
+cv2.destroyAllWindows()
